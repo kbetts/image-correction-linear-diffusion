@@ -1,0 +1,2078 @@
+#LyX 2.2 created this file. For more info see http://www.lyx.org/
+\lyxformat 503
+\begin_document
+\begin_header
+\origin unavailable
+\textclass article
+\begin_preamble
+\usepackage{fancyheadings}
+\pagestyle{fancy}
+\lhead{Kellen Betts}
+\chead{imageCorrectionLinearDiffusion}
+\rhead{160731}
+\end_preamble
+\use_default_options true
+\maintain_unincluded_children false
+\language english
+\language_package default
+\inputencoding auto
+\fontencoding global
+\font_roman "default" "default"
+\font_sans "default" "default"
+\font_typewriter "default" "default"
+\font_math "auto" "auto"
+\font_default_family default
+\use_non_tex_fonts false
+\font_sc false
+\font_osf false
+\font_sf_scale 100 100
+\font_tt_scale 100 100
+\graphics default
+\default_output_format default
+\output_sync 0
+\bibtex_command default
+\index_command default
+\paperfontsize default
+\spacing single
+\use_hyperref false
+\papersize default
+\use_geometry true
+\use_package amsmath 1
+\use_package amssymb 1
+\use_package cancel 1
+\use_package esint 1
+\use_package mathdots 1
+\use_package mathtools 1
+\use_package mhchem 1
+\use_package stackrel 1
+\use_package stmaryrd 1
+\use_package undertilde 1
+\cite_engine basic
+\cite_engine_type default
+\biblio_style plain
+\use_bibtopic false
+\use_indices false
+\paperorientation portrait
+\suppress_date false
+\justification true
+\use_refstyle 1
+\index Index
+\shortcut idx
+\color #008000
+\end_index
+\leftmargin 3cm
+\topmargin 3cm
+\rightmargin 3cm
+\bottommargin 3cm
+\secnumdepth 3
+\tocdepth 3
+\paragraph_separation indent
+\paragraph_indentation default
+\quotes_language english
+\papercolumns 1
+\papersides 1
+\paperpagestyle default
+\tracking_changes false
+\output_changes false
+\html_math_output 0
+\html_css_as_file 0
+\html_be_strict false
+\end_header
+
+\begin_body
+
+\begin_layout Title
+Image Correction with Linear and Diffusion Filtering
+\end_layout
+
+\begin_layout Author
+Kellen Betts
+\end_layout
+
+\begin_layout Date
+Updated July 31, 2016
+\end_layout
+
+\begin_layout Abstract
+In this project corrupted images of male supermodel Derek Zoolander are
+ received, and two image processing techniques are implemented to repair
+ the images.
+ The techniques are used for both color and black and white images.
+ Linear filtering is used to denoise a set of images that are corrupted
+ by noise across the entire image.
+ Using both a Gaussian and Shannon filter, moderate success is achieved.
+ A diffusion process is then developed to restore a second set of images
+ that contain noise confined to a small region.
+ The localized nature of the corruption and spatial flexibility of the diffusion
+ process result is near perfect restoration for the second set of images.
+ Finally, a combination of linear filtering and diffusion is explored as
+ a hybrid method for the first images, but only minimal improvement over
+ the individual methods is observed.
+\end_layout
+
+\begin_layout Section
+Introduction
+\end_layout
+
+\begin_layout Standard
+The setup for this project involves two sets of images (Figure 1) of the
+ fictional male supermodel Derek Zoolander that have been corrupted by protestor
+s.
+ One set of images contains noise across the entire image, and one set is
+ corrupted in a localized region near Derek's nose.
+ The first objective (Task 1) is to repair the images with global noise
+ using a linear filter.
+ Both a Gaussian and Shannon filter will be tested.
+ The next objective (Task 2) is to use a diffusion process to repair the
+ images with noise confined to a small region since diffusion is effective
+ when targeting specific regions of an image.
+ Finally, diffusion and linear filtering are compared and their combination
+ is explored as a hybrid method to achieve better results.
+\begin_inset Separator parbreak
+\end_inset
+
+
+\end_layout
+
+\begin_layout LyX-Code
+\noindent
+\align center
+\begin_inset Graphics
+	filename plots/originals.eps
+	width 55col%
+
+\end_inset
+
+
+\begin_inset Newline newline
+\end_inset
+
+
+\series bold
+
+\begin_inset Box Frameless
+position "t"
+hor_pos "l"
+has_inner_box 1
+inner_pos "t"
+use_parbox 0
+use_makebox 0
+width "60col%"
+special "none"
+height "1in"
+height_special "totalheight"
+thickness "0.4pt"
+separation "3pt"
+shadowsize "4pt"
+framecolor "black"
+backgroundcolor "none"
+status open
+
+\begin_layout Plain Layout
+
+\series bold
+Figure 1.
+
+\series default
+ Original corrupted images received for the project.
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout LyX-Code
+\begin_inset Newpage pagebreak
+\end_inset
+
+
+\end_layout
+
+\begin_layout Section
+Theoretical Background
+\end_layout
+
+\begin_layout Standard
+Linear filtering of images is similar to time-frequency analysis in that
+ the spectral component of data, in this case of an image, is used to apply
+ a linear filter to remove specific frequency components.
+ The basis for the frequency transformation used in this method is the Fourier
+ Transform.
+ For a given function 
+\begin_inset Formula $f(x)$
+\end_inset
+
+ the transform and its inverse are defined,
+\begin_inset Formula 
+\begin{equation}
+F\left(k\right)=\frac{1}{\sqrt{2\pi}}\intop_{-\infty}^{\infty}e^{-ikx}f\left(x\right)dx
+\end{equation}
+
+\end_inset
+
+
+\begin_inset Formula 
+\begin{equation}
+f(x)=\frac{1}{\sqrt{2\pi}}\intop_{-\infty}^{\infty}e^{ikx}F(k)dk
+\end{equation}
+
+\end_inset
+
+where 
+\begin_inset Formula $k$
+\end_inset
+
+ corresponds to the wave-numbers in the trigonometric identity.
+ With the Fourier transform, the image data is integrated over the domain
+ 
+\begin_inset Formula $x\,\epsilon\,\left[-\infty,\infty\right]$
+\end_inset
+
+ resolving the frequency content.
+ Computationally the transform is implemented over a finite domain 
+\begin_inset Formula $x\,\epsilon\,\left[-L,L\right]$
+\end_inset
+
+ using the Fast Fourier Transform (FFT).
+ One of the important advantages of the FFT algorithm is the low operation
+ count of 
+\begin_inset Formula $O\left(N\,\log N\right)$
+\end_inset
+
+ using a 
+\begin_inset Formula $2^{n}$
+\end_inset
+
+ discritization.
+ Additionally, given its trigonometric construction, the transform assumes
+ a 
+\begin_inset Formula $2\pi$
+\end_inset
+
+-periodic domain.
+\end_layout
+
+\begin_layout Standard
+Many different linear filters can be used in image processing.
+ In this project the noise in the image data is shown to be high frequency,
+ so one filter used is a Gaussian (Kutz 13.2.57),
+\begin_inset Formula 
+\begin{equation}
+F\left(k_{x},k_{y}\right)=\exp\left(-\sigma_{x}\left(k_{x}-a\right)^{2}-\sigma_{y}\left(k_{y}-b\right)^{2}\right)
+\end{equation}
+
+\end_inset
+
+centered at 
+\begin_inset Formula $\left(a,b\right)$
+\end_inset
+
+ with filter widths 
+\begin_inset Formula $\sigma_{x}$
+\end_inset
+
+ and 
+\begin_inset Formula $\sigma_{y}$
+\end_inset
+
+ .
+ Another filter used is a Shannon based on the step function,
+\begin_inset Formula 
+\begin{equation}
+F_{A}\left(x,y\right)=\begin{cases}
+1 & if\,x,y\,\epsilon\,A\\
+0 & if\,x,y\,\notin\,A
+\end{cases}
+\end{equation}
+
+\end_inset
+
+where 
+\begin_inset Formula $A$
+\end_inset
+
+ is a targeted area of specified dimensions.
+\end_layout
+
+\begin_layout Standard
+The second method used to remove the noise from image data is diffusion.
+ The use of diffusion can be shown to be equivalent to linear filtering
+ with a Gaussian function by considering a general diffusion equation (Kutz
+ 13.3.58),
+\begin_inset Formula 
+\begin{equation}
+u_{t}=D\nabla^{2}u
+\end{equation}
+
+\end_inset
+
+where 
+\begin_inset Formula $D$
+\end_inset
+
+ is a diffusion coefficient, 
+\begin_inset Formula $u\equiv u\left(x,y\right)$
+\end_inset
+
+, and the Laplacian 
+\begin_inset Formula $\nabla^{2}=\partial_{x}^{2}+\partial_{y}^{2}$
+\end_inset
+
+ .
+ If periodic boundaries are assumed, 
+\begin_inset Formula $\left(5\right)$
+\end_inset
+
+ can be solved using the Fourier transform giving (Kutz 13.3.59),
+\begin_inset Formula 
+\begin{equation}
+\hat{u_{t}}=-D\left(k_{x}^{2}+k_{y}^{2}\right)\hat{u}\quad\rightarrow\quad\hat{u}=\hat{u_{0}}\,\exp\left(-D\left(k_{x}^{2}+k_{y}^{2}\right)t\right)
+\end{equation}
+
+\end_inset
+
+which shows that the linear Gaussian filter 
+\begin_inset Formula $\left(3\right)$
+\end_inset
+
+ is equivalent to the solution 
+\begin_inset Formula $\left(6\right)$
+\end_inset
+
+ of the general diffusion equation 
+\begin_inset Formula $\left(5\right)$
+\end_inset
+
+.
+ To implement this method computationally, 
+\begin_inset Formula $\left(5\right)$
+\end_inset
+
+ can be rewritten (Kutz 13.3.60),
+\begin_inset Formula 
+\begin{equation}
+u_{t}=\nabla\cdot\left(D(x,y\right)\nabla u
+\end{equation}
+
+\end_inset
+
+where 
+\begin_inset Formula $D\left(x,y\right)$
+\end_inset
+
+ is a spatial diffusion coefficient that will be used to apply the method
+ on images with a finite region of noise.
+ This differential equation 
+\begin_inset Formula $\left(7\right)$
+\end_inset
+
+ can be discritized using a second-order center difference scheme where
+ the 
+\begin_inset Formula $x$
+\end_inset
+
+-domain is (Kutz 13.3.61a),
+\begin_inset Formula 
+\begin{equation}
+\frac{\partial^{2}u}{\partial x^{2}}=\frac{1}{\triangle x^{2}}\left[u\left(x+\triangle x,\,y\right)-2u\left(x,\,y\right)+u\left(x-\triangle x,\,y\right)\right]
+\end{equation}
+
+\end_inset
+
+and a similar scheme is used for 
+\family roman
+\series medium
+\shape up
+\size normal
+\emph off
+\bar no
+\strikeout off
+\uuline off
+\uwave off
+\noun off
+\color none
+
+\begin_inset Formula $\nicefrac{\partial^{2}u}{\partial y^{2}}$
+\end_inset
+
+.
+ The discritized linear system for 
+\begin_inset Formula $\left(7\right)$
+\end_inset
+
+ in one dimension is given by (Kutz 13.3.63),
+\begin_inset Formula 
+\begin{equation}
+\frac{d\mathbf{u}}{dt}=\frac{k}{\triangle x^{2}}\mathbf{Au}
+\end{equation}
+
+\end_inset
+
+where the 
+\family default
+\series default
+\shape default
+\size default
+\emph default
+\bar default
+\strikeout default
+\uuline default
+\uwave default
+\noun default
+\color inherit
+second-order center difference scheme 
+\begin_inset Formula $\left(8\right)$
+\end_inset
+
+ with periodic boundaries gives the Laplacian operator (Kutz 13.3.64),
+\begin_inset Formula 
+\begin{equation}
+\mathbf{A}=\begin{bmatrix}-2 & 1 & 0 & \cdots & 0 & 1\\
+1 & -2 & 1 & 0 &  & 0\\
+0 & \ddots & \ddots & \ddots &  & \vdots\\
+\vdots &  &  &  &  & 0\\
+0 &  & 0 & 1 & -2 & 1\\
+1 & 0 & \cdots & 0 & 1 & -2
+\end{bmatrix}
+\end{equation}
+
+\end_inset
+
+To denoise images in a finite region, diffusion is localized by defining
+ the spatial coefficient 
+\begin_inset Formula $D\left(x,y\right)$
+\end_inset
+
+ using a smooth Gaussian similar to the linear filter 
+\begin_inset Formula $\left(3\right)$
+\end_inset
+
+ with, 
+\begin_inset Formula 
+\begin{equation}
+D\left(x,y\right)=C\,\exp\left(-\sigma_{x}\left(x-a\right)^{2}-\sigma_{y}\left(y-b\right)^{2}\right)
+\end{equation}
+
+\end_inset
+
+which is centered at 
+\begin_inset Formula $\left(a,b\right)$
+\end_inset
+
+ with the constant 
+\begin_inset Formula $C$
+\end_inset
+
+ and widths 
+\begin_inset Formula $\sigma_{x}$
+\end_inset
+
+ and 
+\begin_inset Formula $\sigma_{y}$
+\end_inset
+
+ .
+ 
+\end_layout
+
+\begin_layout Section
+Algorithm Implementation and Development
+\end_layout
+
+\begin_layout Subsection*
+Image Import/Plotting:
+\end_layout
+
+\begin_layout Standard
+The JPG images are imported using the 
+\begin_inset Formula $\mathtt{imread}$
+\end_inset
+
+ command.
+ The incoming data is in 8-bit integer format, so it is converted to double
+ before any further operations are performed.
+ Black and white images import as a 
+\begin_inset Formula $x\times y\times1$
+\end_inset
+
+ grid, and color images as 
+\begin_inset Formula $x\times y\times3$
+\end_inset
+
+ corresponding to the rgb color profile.
+ Each color channel is processed separately, then stitched back together
+ at the end.
+ Plotting of images is done using the 
+\begin_inset Formula $\mathtt{imshow}$
+\end_inset
+
+ command requiring conversion back to 8-bit integer format.
+ Several independent plotting functions are developed (see Appendix B) which
+ greatly simplifies the plot code needed to output the results from the
+ various filtering and diffusion processes.
+\end_layout
+
+\begin_layout Subsection*
+Linear Filtering:
+\end_layout
+
+\begin_layout Standard
+There are four basic steps in the linear filtering procedure:
+\end_layout
+
+\begin_layout Enumerate
+Importing images and initializing vectors/parameters.
+\end_layout
+
+\begin_layout Enumerate
+Transforming image data into frequency domain using FFT.
+\end_layout
+
+\begin_layout Enumerate
+Applying Gaussian or Shannon filter function.
+\end_layout
+
+\begin_layout Enumerate
+Inverse transform of the filtered data back to spatial domain.
+\end_layout
+
+\begin_layout Standard
+The flow of operations is controlled by a main script 
+\begin_inset Formula $\mathtt{hw3\_task1.m}$
+\end_inset
+
+ .
+ The images are 253x361 so the 
+\begin_inset Formula $x,y$
+\end_inset
+
+ domain does not match the 
+\begin_inset Formula $2^{n}$
+\end_inset
+
+ discritization necessary to achieve minimum operation count with the FFT.
+ The closest 
+\begin_inset Formula $2^{n}$
+\end_inset
+
+ discritization is 
+\begin_inset Formula $2^{8}\times2^{9}=256\times512$
+\end_inset
+
+ and so rescaling would require significant extrapolation.
+ 
+\end_layout
+
+\begin_layout Standard
+The primary filtering operations are run in a separate function 
+\begin_inset Formula $\mathtt{hw3\_filter.m}$
+\end_inset
+
+ so that exploration of optimal parameters can be automated.
+ In the function, the frequency domain is discritized 
+\begin_inset Formula $1:x_{n}$
+\end_inset
+
+ and 
+\begin_inset Formula $1:y_{n}$
+\end_inset
+
+ because the filter is applied to frequency data that is shifted back to
+ the linear discritization.
+ 1D wave-number vectors are transformed to 2D grids using the 
+\begin_inset Formula $\mathtt{meshgrid}$
+\end_inset
+
+ command.
+ The Gaussian filter is calculated using,
+\begin_inset Formula 
+\[
+\mathtt{F=exp(-sigma(k)*(Kx-(w/2+1)).^{2}-sigma(k)*(Ky-(h/2+1)).^{2})}
+\]
+
+\end_inset
+
+where the sigma and center parameters are explored extensively to achieve
+ best results.
+ A Shannon filter centered at 
+\begin_inset Formula $\left(a,b\right)$
+\end_inset
+
+ is implemented using,
+\begin_inset Formula 
+\[
+\mathtt{F(b-width:1:b+width,a-width:1:a+width)=1}
+\]
+
+\end_inset
+
+with the remaining regions of 
+\begin_inset Formula $F$
+\end_inset
+
+ filled with zeros and width parameter explored until best results are achieved.
+ 
+\end_layout
+
+\begin_layout Standard
+The 2D image data (individual color channel if rgb) is transformed and shifted
+ in frequency domain using the 
+\begin_inset Formula $\mathtt{fft2}$
+\end_inset
+
+ and 
+\begin_inset Formula $\mathtt{fftshift}$
+\end_inset
+
+ commands respectively.
+ The frequency data is then multiplied by the specified filter.
+ Finally, the data is inverse shifted/transformed and returned to the main
+ script for plotting and analysis.
+\end_layout
+
+\begin_layout Subsection*
+Diffusion:
+\end_layout
+
+\begin_layout Standard
+There are four basic steps in the diffusion procedure:
+\end_layout
+
+\begin_layout Enumerate
+Import of images and initialization of vectors/parameters.
+\end_layout
+
+\begin_layout Enumerate
+Building a sparse 2D differentiation matrix 
+\begin_inset Formula $\left(L\right)$
+\end_inset
+
+.
+\end_layout
+
+\begin_layout Enumerate
+Building a sparse coefficient matrix 
+\begin_inset Formula $D\left(x,y\right)$
+\end_inset
+
+ for localized diffusion.
+\end_layout
+
+\begin_layout Enumerate
+Solving the linear system with the ODE solver.
+\end_layout
+
+\begin_layout Standard
+The flow of operations is controlled by a main script 
+\begin_inset Formula $\mathtt{hw3\_task2.m}$
+\end_inset
+
+, with primary operations run in the separate function 
+\begin_inset Formula $\mathtt{hw3\_diffusion.m}$
+\end_inset
+
+.
+ The spatial domains 
+\begin_inset Formula $\left(x,y\right)$
+\end_inset
+
+ are linearly discritized.
+ Sparse derivative matrices are built using the 
+\begin_inset Formula $\mathtt{spdiags}$
+\end_inset
+
+ command for each 1D domain 
+\begin_inset Formula $\left(x,y\right)$
+\end_inset
+
+ corresponding to the 
+\begin_inset Formula $A$
+\end_inset
+
+ matrix 
+\begin_inset Formula $\left(10\right)$
+\end_inset
+
+.
+ The 1D operators are then stitched together to make a sparse 2D Laplacian
+ operator 
+\begin_inset Formula $\left(L\right)$
+\end_inset
+
+ using the 
+\begin_inset Formula $\mathtt{kron}$
+\end_inset
+
+ command.
+\end_layout
+
+\begin_layout Standard
+For diffusion applied to a localized region, the sparse coefficient matrix
+ 
+\begin_inset Formula $D\left(x,y\right)$
+\end_inset
+
+ is built using the 
+\begin_inset Formula $\mathtt{spdiags}$
+\end_inset
+
+ command as well.
+ The matrix is discritized using a smooth Gaussian function,
+\begin_inset Formula 
+\[
+\mathtt{D2(jx,jy)=C*D2(jx,jy)*exp(-sigma*(jx-a).^{2}-sigma*(jy-b).^{2})}
+\]
+
+\end_inset
+
+which gives the diffusion operation spatial localization centered at 
+\begin_inset Formula $\left(a,b\right)$
+\end_inset
+
+.
+ The sigma and center 
+\begin_inset Formula $\left(a,b\right)$
+\end_inset
+
+ parameters are explored extensively to achieve best results.
+\end_layout
+
+\begin_layout Standard
+Next, the 2D image data (individual color channel if rgb) is passed to the
+ ODE solver 
+\begin_inset Formula $\mathtt{ode113}$
+\end_inset
+
+ (see Appendix A) with the 2D Laplacian operator 
+\begin_inset Formula $\left(L\right)$
+\end_inset
+
+, coefficient matrix 
+\begin_inset Formula $D\left(x,y\right)$
+\end_inset
+
+, and parameters for the time interval steps.
+ The ODE solver calls a separate function 
+\begin_inset Formula $\mathtt{hw3\_rhs.m}$
+\end_inset
+
+ which contains the right-hand-side operation of the linear system,
+\begin_inset Formula 
+\[
+\mathtt{rhs=coeff*L*u}
+\]
+
+\end_inset
+
+Having multi-channel data (rgb color) means output from the ODE solver has
+ to be handled carefully to ensure images are stitched back together correctly.
+\end_layout
+
+\begin_layout Section
+Computational Results
+\end_layout
+
+\begin_layout Subsection*
+Task 1:
+\end_layout
+
+\begin_layout Standard
+The objective in Task 1 is to repair the set of images (Figure 2) with global
+ noise using a linear filter.
+ The images both appear to have similar noise across the entire image.
+ Visualizing the frequency component of the image on a log scale (Figure
+ 3, left) clearly shows frequencies in the unfiltered image are concentrated
+ at low frequencies, so the objective is to remove the effects of high-frequency
+ noise.
+\end_layout
+
+\begin_layout Standard
+\begin_inset Newpage pagebreak
+\end_inset
+
+
+\begin_inset Separator parbreak
+\end_inset
+
+
+\end_layout
+
+\begin_layout LyX-Code
+\noindent
+\align center
+\begin_inset Graphics
+	filename plots/task1_originals.pdf
+	width 75col%
+
+\end_inset
+
+
+\series bold
+
+\begin_inset Newline newline
+\end_inset
+
+
+\begin_inset Box Frameless
+position "t"
+hor_pos "l"
+has_inner_box 1
+inner_pos "t"
+use_parbox 0
+use_makebox 0
+width "75col%"
+special "none"
+height "1in"
+height_special "totalheight"
+thickness "0.4pt"
+separation "3pt"
+shadowsize "4pt"
+framecolor "black"
+backgroundcolor "none"
+status open
+
+\begin_layout Plain Layout
+
+\series bold
+Figure 2.
+
+\series default
+ Original images showing noise corruption across the entire 
+\begin_inset Formula $x,y$
+\end_inset
+
+ spatial domain.
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout LyX-Code
+\noindent
+\align center
+\begin_inset VSpace 4pheight%
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+For the Gaussian filter, different values of the width parameter were explored
+ (Figure 4) with a value 
+\begin_inset Formula $\sigma\approx0.0025$
+\end_inset
+
+ showing the best balance of noise reduction and blur.
+ The frequency plot for the filtered image (Figure 3, right) shows that
+ the Gaussian filter with 
+\begin_inset Formula $\sigma=0.0025$
+\end_inset
+
+ spreads the distribution.
+ When processing the images, each channel is isolated and filtered separately
+ (Figure 5).
+ The best results achieved for the Gaussian filter with both the color and
+ black and white images are seen in Figure 6.
+ These images indicate the Gaussian filter is able to moderately reduce
+ the noise in the original images with slight image blur.
+\begin_inset Separator parbreak
+\end_inset
+
+
+\end_layout
+
+\begin_layout LyX-Code
+\noindent
+\align center
+\begin_inset VSpace 2pheight%
+\end_inset
+
+
+\end_layout
+
+\begin_layout LyX-Code
+\noindent
+\align center
+\begin_inset Graphics
+	filename plots/task1_transform_gauss.eps
+	width 75col%
+
+\end_inset
+
+
+\series bold
+
+\begin_inset Newline newline
+\end_inset
+
+
+\begin_inset Box Frameless
+position "t"
+hor_pos "l"
+has_inner_box 1
+inner_pos "t"
+use_parbox 0
+use_makebox 0
+width "75col%"
+special "none"
+height "1in"
+height_special "totalheight"
+thickness "0.4pt"
+separation "3pt"
+shadowsize "4pt"
+framecolor "black"
+backgroundcolor "none"
+status open
+
+\begin_layout Plain Layout
+
+\series bold
+Figure 3.
+
+\series default
+ Comparison of the log of the Fourier transform for the original noisy image
+ (left) and Gaussian filtered with 
+\begin_inset Formula $\sigma=0.0025$
+\end_inset
+
+ (right).
+ The filter appears to improve the frequency distribution moderately.
+ 
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout LyX-Code
+\begin_inset Newpage pagebreak
+\end_inset
+
+
+\end_layout
+
+\begin_layout LyX-Code
+\noindent
+\align center
+\begin_inset Graphics
+	filename plots/task1_sigSeries1.eps
+	width 75col%
+
+\end_inset
+
+
+\series bold
+
+\begin_inset Newline newline
+\end_inset
+
+
+\begin_inset Box Frameless
+position "t"
+hor_pos "l"
+has_inner_box 1
+inner_pos "t"
+use_parbox 0
+use_makebox 0
+width "75col%"
+special "none"
+height "1in"
+height_special "totalheight"
+thickness "0.4pt"
+separation "3pt"
+shadowsize "4pt"
+framecolor "black"
+backgroundcolor "none"
+status open
+
+\begin_layout Plain Layout
+
+\series bold
+Figure 4.
+
+\series default
+ Series of images exploring Gaussian filter width 
+\begin_inset Formula $\left(\sigma\right)$
+\end_inset
+
+ values.
+ The optimal value at 
+\begin_inset Formula $\sigma\approx0.0025$
+\end_inset
+
+ best balances the tradeoff between noise reduction and blurring.
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout LyX-Code
+\noindent
+\align center
+
+\end_layout
+
+\begin_layout LyX-Code
+\noindent
+\align center
+\begin_inset Graphics
+	filename plots/task1_filter_color.eps
+	width 75col%
+
+\end_inset
+
+
+\series bold
+
+\begin_inset Newline newline
+\end_inset
+
+
+\begin_inset Box Frameless
+position "t"
+hor_pos "l"
+has_inner_box 1
+inner_pos "t"
+use_parbox 0
+use_makebox 0
+width "75col%"
+special "none"
+height "1in"
+height_special "totalheight"
+thickness "0.4pt"
+separation "3pt"
+shadowsize "4pt"
+framecolor "black"
+backgroundcolor "none"
+status open
+
+\begin_layout Plain Layout
+
+\series bold
+Figure 5.
+
+\series default
+ The Gaussian filter 
+\begin_inset Formula $\left(\sigma=0.0025\right)$
+\end_inset
+
+ is applied separately for each channel of the color image.
+ The channels are then stitched back together to build a filter color image.
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout LyX-Code
+\begin_inset Newpage pagebreak
+\end_inset
+
+
+\end_layout
+
+\begin_layout LyX-Code
+
+\end_layout
+
+\begin_layout LyX-Code
+\noindent
+\align center
+\begin_inset Graphics
+	filename plots/task1_result_gauss.pdf
+	width 65col%
+
+\end_inset
+
+
+\series bold
+
+\begin_inset Newline newline
+\end_inset
+
+
+\begin_inset Box Frameless
+position "t"
+hor_pos "l"
+has_inner_box 1
+inner_pos "t"
+use_parbox 0
+use_makebox 0
+width "75col%"
+special "none"
+height "1in"
+height_special "totalheight"
+thickness "0.4pt"
+separation "3pt"
+shadowsize "4pt"
+framecolor "black"
+backgroundcolor "none"
+status open
+
+\begin_layout Plain Layout
+
+\series bold
+Figure 6.
+
+\series default
+ Comparison of the original noisy image (left) with the best results achieved
+ for the Gaussian filter (right) with 
+\begin_inset Formula $\sigma=0.0025$
+\end_inset
+
+.
+ The filter appears to moderately remove the noise in the image while slightly
+ reducing image sharpness.
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout LyX-Code
+\noindent
+\align center
+\begin_inset VSpace 0.5pheight%
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+For the Shannon filter, testing different values of the width parameter
+ shows that a width of 50 pixels has the best balance of noise reduction
+ and blur.
+ The effect of the Shannon filter on the frequency distribution is seen
+ in Figure 7 (right), where all frequencies that fall outside the window
+ are zeroed out.
+ Figure 8 shows the best results for both the Gaussian and Shannon filters.
+ The results indicate that both filters moderately removed the noise corrupting
+ the images.
+ The Shannon filter appears to better preserve the sharpness of the image,
+ which agrees with its step-function construction.
+ Conversely, the smoothly varying Gaussian appears to remove more noise
+ (it can reach inside the Shannon window), but also slightly reduces image
+ sharpness meaning some necessary frequency content is lost.
+\begin_inset Separator parbreak
+\end_inset
+
+
+\end_layout
+
+\begin_layout LyX-Code
+\noindent
+\align center
+\begin_inset Graphics
+	filename plots/task1_transform_shan.eps
+	width 75col%
+
+\end_inset
+
+
+\series bold
+
+\begin_inset Newline newline
+\end_inset
+
+
+\begin_inset Box Frameless
+position "t"
+hor_pos "l"
+has_inner_box 1
+inner_pos "t"
+use_parbox 0
+use_makebox 0
+width "75col%"
+special "none"
+height "1in"
+height_special "totalheight"
+thickness "0.4pt"
+separation "3pt"
+shadowsize "4pt"
+framecolor "black"
+backgroundcolor "none"
+status open
+
+\begin_layout Plain Layout
+
+\series bold
+Figure 7.
+
+\series default
+ Comparison of the log of the Fourier transform for the original noisy image
+ (left) and Shannon filtered with a window width of 50 pixels (right).
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout LyX-Code
+\begin_inset Newpage pagebreak
+\end_inset
+
+
+\end_layout
+
+\begin_layout LyX-Code
+
+\end_layout
+
+\begin_layout LyX-Code
+\noindent
+\align center
+\begin_inset Graphics
+	filename plots/task1_comparison.eps
+	width 85col%
+
+\end_inset
+
+
+\series bold
+
+\begin_inset Newline newline
+\end_inset
+
+
+\begin_inset Box Frameless
+position "t"
+hor_pos "l"
+has_inner_box 1
+inner_pos "t"
+use_parbox 0
+use_makebox 0
+width "75col%"
+special "none"
+height "1in"
+height_special "totalheight"
+thickness "0.4pt"
+separation "3pt"
+shadowsize "4pt"
+framecolor "black"
+backgroundcolor "none"
+status open
+
+\begin_layout Plain Layout
+
+\series bold
+Figure 8.
+
+\series default
+ Comparison of the original noisy image (left) with the best results for
+ the Gaussian filter (center) with 
+\begin_inset Formula $\sigma=0.0025$
+\end_inset
+
+ and the Shannon filter (right) with a width of 50px.
+ The Shannon filter appears to better preserve the sharpness of the image,
+ while the Gaussian appears to remove more noise but also slightly reduce
+ image sharpness.
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\noindent
+\align center
+\begin_inset VSpace 0.5pheight%
+\end_inset
+
+
+\end_layout
+
+\begin_layout Subsection*
+Task 2:
+\end_layout
+
+\begin_layout Standard
+The objective of Task 2 is to repair a set of images (Figure 9) with noise
+ corruption localized to a small square region.
+ Both images appear to have the same corruption.
+ The noise patch in the images appears slightly lower and left of image
+ center, so the 
+\begin_inset Formula $\left(a,b\right)$
+\end_inset
+
+ coordinates were iterated starting from image center until the optimal
+ coordinates 
+\begin_inset Formula $\left(155,162\right)$
+\end_inset
+
+ were determined.
+ The time interval parameter is extensively explored, and as seen in Figure
+ 10 a value of 
+\begin_inset Formula $t\approx0.03$
+\end_inset
+
+ best balances the tradeoff between removal of the local noise and preservation
+ of adjacent image detail.
+ For the black and white images, a slight higher value 
+\begin_inset Formula $\left(t\approx0.05\right)$
+\end_inset
+
+ is optimal.
+ The best results achieved for denoising with the diffusion process (Figure
+ 11) show the noise patch is effectively removed with minimal disturbance
+ to adjacent detail.
+ Since the patch is removed with the diffusion process, additional filtering
+ is unnecessary.
+\end_layout
+
+\begin_layout LyX-Code
+
+\end_layout
+
+\begin_layout LyX-Code
+\noindent
+\align center
+\begin_inset Graphics
+	filename plots/task2_originals.pdf
+	width 75col%
+
+\end_inset
+
+
+\series bold
+
+\begin_inset Newline newline
+\end_inset
+
+
+\begin_inset Box Frameless
+position "t"
+hor_pos "l"
+has_inner_box 1
+inner_pos "t"
+use_parbox 0
+use_makebox 0
+width "75col%"
+special "none"
+height "1in"
+height_special "totalheight"
+thickness "0.4pt"
+separation "3pt"
+shadowsize "4pt"
+framecolor "black"
+backgroundcolor "none"
+status open
+
+\begin_layout Plain Layout
+
+\series bold
+Figure 9.
+
+\series default
+ Original images showing noise corruption localized to a square region near
+ the nose.
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout LyX-Code
+\begin_inset Newpage pagebreak
+\end_inset
+
+
+\end_layout
+
+\begin_layout LyX-Code
+\noindent
+\align center
+\begin_inset Graphics
+	filename plots/task2_color_series.eps
+	width 75col%
+
+\end_inset
+
+
+\series bold
+
+\begin_inset Newline newline
+\end_inset
+
+
+\begin_inset Box Frameless
+position "t"
+hor_pos "l"
+has_inner_box 1
+inner_pos "t"
+use_parbox 0
+use_makebox 0
+width "75col%"
+special "none"
+height "1in"
+height_special "totalheight"
+thickness "0.4pt"
+separation "3pt"
+shadowsize "4pt"
+framecolor "black"
+backgroundcolor "none"
+status open
+
+\begin_layout Plain Layout
+
+\series bold
+Figure 10.
+
+\series default
+ Series exploring time interval parameter.
+ The value at 
+\begin_inset Formula $t\approx0.03$
+\end_inset
+
+ best balances the tradeoff between removal of the local noise and preservation
+ of adjacent image detail.
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout LyX-Code
+
+\end_layout
+
+\begin_layout LyX-Code
+\noindent
+\align center
+\begin_inset Graphics
+	filename plots/task2_result.eps
+	width 75col%
+
+\end_inset
+
+
+\series bold
+
+\begin_inset Newline newline
+\end_inset
+
+
+\begin_inset Box Frameless
+position "t"
+hor_pos "l"
+has_inner_box 1
+inner_pos "t"
+use_parbox 0
+use_makebox 0
+width "75col%"
+special "none"
+height "1in"
+height_special "totalheight"
+thickness "0.4pt"
+separation "3pt"
+shadowsize "4pt"
+framecolor "black"
+backgroundcolor "none"
+status open
+
+\begin_layout Plain Layout
+
+\series bold
+Figure 11.
+
+\series default
+ Comparison of the original (left) with localize noise patch and the best
+ result for denoising with the diffusion process (right).
+ These show the noise patch is effectively removed with minimal disturbance
+ to adjacent detail.
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout LyX-Code
+\begin_inset Newpage pagebreak
+\end_inset
+
+
+\end_layout
+
+\begin_layout Subsection*
+Additional Tests:
+\end_layout
+
+\begin_layout Standard
+Using the techniques developed in Task 1 and Task 2, the diffusion and filtering
+ processes can be further explored by applying diffusion to the images from
+ Task 1 and comparing the results with the filters.
+ First, the diffusion process is optimized for the images from Task 1 using
+ a constant coefficient 
+\begin_inset Formula $D$
+\end_inset
+
+ since the targeted spatial region is the entire image and testing the time
+ interval parameter.
+ The optimal values for these images are 
+\begin_inset Formula $D=0.005$
+\end_inset
+
+ at 
+\begin_inset Formula $t\approx0.01$
+\end_inset
+
+ which best balances the tradeoff between removal noise and loss of image
+ sharpness.
+ Comparison (Figure 12) of the diffusion process at 
+\begin_inset Formula $t=0.01$
+\end_inset
+
+ with the Gaussian and Shannon filters shows that diffusion achieves similar
+ results with a moderate reduction in noise.
+ This is not surprising since the linear Gaussian filter 
+\begin_inset Formula $\left(3\right)$
+\end_inset
+
+ and Fourier solution to the diffusion equation 
+\begin_inset Formula $\left(6\right)$
+\end_inset
+
+ are shown to be equivalent (see section 2).
+\end_layout
+
+\begin_layout Standard
+Finally, sequential denoising techniques with both filtering and diffusion
+ are tested using the techniques and parameters previously established.
+ If the original noisy images are filtered using the Gaussian then subsequently
+ sent through the diffusion process (Figure 13), only moderate improvement
+ in the final image quality is seen.
+ Similar results are seen if the sequence is reversed with diffusion applied
+ first (Figure 14).
+\begin_inset Separator parbreak
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\noindent
+\align center
+\begin_inset VSpace 5pheight%
+\end_inset
+
+
+\end_layout
+
+\begin_layout LyX-Code
+\noindent
+\align center
+\begin_inset Graphics
+	filename plots/versus.eps
+	width 85col%
+
+\end_inset
+
+
+\series bold
+
+\begin_inset Newline newline
+\end_inset
+
+
+\begin_inset Box Frameless
+position "t"
+hor_pos "l"
+has_inner_box 1
+inner_pos "t"
+use_parbox 0
+use_makebox 0
+width "75col%"
+special "none"
+height "1in"
+height_special "totalheight"
+thickness "0.4pt"
+separation "3pt"
+shadowsize "4pt"
+framecolor "black"
+backgroundcolor "none"
+status open
+
+\begin_layout Plain Layout
+
+\series bold
+Figure 12.
+
+\series default
+ Comparison of the original noisy image (upper left) with denoising by diffusion
+ (upper right), Gaussian filter (lower left), and Shannon filter (lower
+ right).
+ Diffusion is similar to both filter methods, falling in the middle for
+ the tradeoff of noise removal and image sharpness.
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout LyX-Code
+\begin_inset Newpage pagebreak
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\noindent
+\align center
+\begin_inset VSpace 1pheight%
+\end_inset
+
+
+\end_layout
+
+\begin_layout LyX-Code
+\noindent
+\align center
+\begin_inset Graphics
+	filename plots/hybrid_filtFirst.eps
+	width 85col%
+
+\end_inset
+
+
+\series bold
+
+\begin_inset Newline newline
+\end_inset
+
+
+\begin_inset Box Frameless
+position "t"
+hor_pos "l"
+has_inner_box 1
+inner_pos "t"
+use_parbox 0
+use_makebox 0
+width "75col%"
+special "none"
+height "1in"
+height_special "totalheight"
+thickness "0.4pt"
+separation "3pt"
+shadowsize "4pt"
+framecolor "black"
+backgroundcolor "none"
+status open
+
+\begin_layout Plain Layout
+
+\series bold
+Figure 13.
+
+\series default
+ Comparison of the original noisy image (left) with the results from the
+ Gaussian filter (center) and a sequential denoising by diffusion (right).
+ Moderate improvement in image quality is achieved with this technique.
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\noindent
+\align center
+\begin_inset VSpace 5pheight%
+\end_inset
+
+
+\end_layout
+
+\begin_layout LyX-Code
+
+\end_layout
+
+\begin_layout LyX-Code
+\noindent
+\align center
+\begin_inset Graphics
+	filename plots/hybrid_diffFirst.eps
+	width 85col%
+
+\end_inset
+
+
+\series bold
+
+\begin_inset Newline newline
+\end_inset
+
+
+\begin_inset Box Frameless
+position "t"
+hor_pos "l"
+has_inner_box 1
+inner_pos "t"
+use_parbox 0
+use_makebox 0
+width "75col%"
+special "none"
+height "1in"
+height_special "totalheight"
+thickness "0.4pt"
+separation "3pt"
+shadowsize "4pt"
+framecolor "black"
+backgroundcolor "none"
+status open
+
+\begin_layout Plain Layout
+
+\series bold
+Figure 14.
+
+\series default
+ Comparison of the original noisy image (left) with the results from denoising
+ by diffusion (center) and sequential Gaussian filter (right).
+ Moderate improvement in image quality is achieved with this technique as
+ well.
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout LyX-Code
+\begin_inset Newpage pagebreak
+\end_inset
+
+
+\end_layout
+
+\begin_layout Section
+Summary and Conclusions
+\end_layout
+
+\begin_layout Standard
+Ultimately, in this project image processing techniques, including linear
+ filtering and diffusion, are developed and applied to two sets of images
+ corrupted by noise.
+ One set is corrupted by noise across the entire image, and linear filtering
+ with both Gaussian and Shannon filters are shown to have moderate success.
+ The second set of images has a patch of noise localized to a small square
+ region.
+ These images are repaired using a diffusion process with a targeted spatial
+ coefficient matrix.
+ The results show that diffusion is highly effective at removing the localized
+ noise, but when it applied to the images with noise across the entire image
+ the results are comparable to linear filtering.
+ Additionally, hybrid techniques with both linear filtering and diffusion
+ show minimal improvement.
+ 
+\end_layout
+
+\begin_layout Standard
+One of the more substantial challenges faced in this project was building
+ the targeted coefficient matrix for the diffusion process.
+ The initial version I made caused matrix multiplication errors when used
+ in the rhs function.
+ Fortunately, one of my classmates provided a suggestion on the discussion
+ board that resolved the dimensioning problem I was having, and I am indebted
+ to their contribution.
+ 
+\end_layout
+
+\begin_layout Section*
+Appendix A
+\end_layout
+
+\begin_layout Subsubsection*
+MATLAB commands used:
+\end_layout
+
+\begin_layout Description
+abs Takes the absolute value.
+\end_layout
+
+\begin_layout Description
+ceil Used to round an operation toward 
+\begin_inset Formula $\infty$
+\end_inset
+
+.
+\end_layout
+
+\begin_layout Description
+eye Builds identity matrices for given dimension.
+ Used when building 1D derivative matrices and 2D Laplacian operator.
+\end_layout
+
+\begin_layout Description
+fftn The all important FFT function, which performs a discritized Fourier
+ Transforms.
+ This version of the function transforms 
+\begin_inset Formula $n$
+\end_inset
+
+-dimensional data.
+ The 
+\begin_inset Formula $\mathtt{fft}$
+\end_inset
+
+ and 
+\begin_inset Formula $\mathtt{fft}2$
+\end_inset
+
+ versions transform 1- and 2-dimensional data respectively.
+\end_layout
+
+\begin_layout Description
+fftshift The output of the 
+\begin_inset Formula $\mathtt{fft}$
+\end_inset
+
+ algorithm is shifted (butterfly algorithm), so data in the frequency domain
+ is shifted back using this function before plotting.
+\end_layout
+
+\begin_layout Description
+imread Load the data in an image file into a matrix that can then be used
+ for subsequent data manipulations.
+\end_layout
+
+\begin_layout Description
+imshow Used to plot image data.
+\end_layout
+
+\begin_layout Description
+kron Builds a large matrix filled with all possible element-wise products
+ for given matrices.
+ Used to build the 2D l=Laplacian operator from 1D derivative matrices.
+\end_layout
+
+\begin_layout Description
+load Loads data from an external file.
+\end_layout
+
+\begin_layout Description
+length Used to get the length of vectors.
+\end_layout
+
+\begin_layout Description
+linspace Used to build a linear vector with 
+\begin_inset Formula $n+1$
+\end_inset
+
+ points for the spatial domain.
+ The vector is then trimmed to 
+\begin_inset Formula $n$
+\end_inset
+
+ points due to the periodic boundaries.
+\end_layout
+
+\begin_layout Description
+meshgrid Transforms the domain of given vector input to multi-dimension
+ matrices.
+\end_layout
+
+\begin_layout Description
+nextpow2 Used to find the next power of 2 for a given input.
+ Since FFT is optimal with a 
+\begin_inset Formula $2^{n}$
+\end_inset
+
+ discritization, the datasets are trimmed to a 
+\begin_inset Formula $2^{n}$
+\end_inset
+
+ length.
+\end_layout
+
+\begin_layout Description
+num2str Used to convert a number to a string.
+\end_layout
+
+\begin_layout Description
+ode113 Non-stiff ODE solver use for time evolution of linear system.
+ Has a default relative tolerance of 
+\begin_inset Formula $10^{-3}$
+\end_inset
+
+ and absolute tolerance of 
+\begin_inset Formula $10^{-6}$
+\end_inset
+
+.
+\end_layout
+
+\begin_layout Description
+ones Used to build vector/matrices pre-filled with 
+\begin_inset Quotes eld
+\end_inset
+
+1
+\begin_inset Quotes erd
+\end_inset
+
+.
+\end_layout
+
+\begin_layout Description
+pcolor Used to plot the 3D spectrograms.
+\end_layout
+
+\begin_layout Description
+plot Used to plot the various parameters agains time or frequency.
+\end_layout
+
+\begin_layout Description
+real Returns 
+\begin_inset Formula $\mathrm{Re}\left(z\right)$
+\end_inset
+
+ for a given input.
+\end_layout
+
+\begin_layout Description
+reshape Reshapes vector or matrix for given dimensions.
+\end_layout
+
+\begin_layout Description
+spdiags Builds sparse diagonal matrices from given vector and indices.
+ This is a critical tool for lower operation count when solving linear systems.
+\end_layout
+
+\begin_layout Description
+strcat Used to concatenate a string.
+\end_layout
+
+\begin_layout Description
+subplot Used to produce plot arrays.
+\end_layout
+
+\begin_layout Description
+switch Condition structure used to vary code execution based on a specified
+ tag.
+\end_layout
+
+\begin_layout Description
+tic/toc Used to time the operations.
+\end_layout
+
+\begin_layout Description
+uint8 Used to convert data to 8-bit integer format.
+\end_layout
+
+\begin_layout Description
+zeros Used to build vectors and matrices filled with 
+\begin_inset Quotes eld
+\end_inset
+
+0
+\begin_inset Quotes erd
+\end_inset
+
+.
+\end_layout
+
+\begin_layout Section*
+Appendix B
+\end_layout
+
+\begin_layout Standard
+See the project root for files.
+\end_layout
+
+\begin_layout Subsection*
+Task 1:
+\end_layout
+
+\begin_layout Standard
+Main control script 
+\begin_inset Formula $\mathtt{task1.m}$
+\end_inset
+
+ and linear filtering function 
+\begin_inset Formula $\mathtt{filter.m}$
+\end_inset
+
+.
+\end_layout
+
+\begin_layout Subsection*
+Task 2:
+\end_layout
+
+\begin_layout Standard
+Main control script 
+\begin_inset Formula $\mathtt{task2.m}$
+\end_inset
+
+, diffusion filtering function 
+\begin_inset Formula $\mathtt{diffusion.m}$
+\end_inset
+
+ and right-hand-side function 
+\begin_inset Formula $\mathtt{rhs.m}$
+\end_inset
+
+.
+\end_layout
+
+\begin_layout Subsection*
+Plotting and related:
+\end_layout
+
+\begin_layout Itemize
+\begin_inset Formula $\mathtt{plot\_imgPick.m}$
+\end_inset
+
+
+\end_layout
+
+\begin_layout Itemize
+\begin_inset Formula $\mathtt{plot\_array22.m}$
+\end_inset
+
+ (note: 
+\begin_inset Formula $\mathtt{plot\_array23.m}$
+\end_inset
+
+ is essentially identical but plots a 2x3 subplot array)
+\end_layout
+
+\begin_layout Itemize
+\begin_inset Formula $\mathtt{plot\_diffSeries.m}$
+\end_inset
+
+
+\end_layout
+
+\begin_layout Itemize
+\begin_inset Formula $\mathtt{plot\_filtered.m}$
+\end_inset
+
+
+\end_layout
+
+\begin_layout Itemize
+\begin_inset Formula $\mathtt{plot\_fourier.m}$
+\end_inset
+
+
+\end_layout
+
+\end_body
+\end_document
